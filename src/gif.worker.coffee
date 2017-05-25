@@ -3,6 +3,8 @@ GIFEncoder = require './GIFEncoder.js'
 renderFrame = (frame) ->
   encoder = new GIFEncoder frame.width, frame.height
 
+  encoder.setRotate frame.rotate
+
   if frame.index is 0
     encoder.writeHeader()
   else

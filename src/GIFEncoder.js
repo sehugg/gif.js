@@ -82,6 +82,7 @@ function GIFEncoder(width, height) {
   this.sample = 10; // default sample interval for quantizer
   this.dither = false; // default dithering
   this.globalPalette = false;
+  this.rotate = 0; // no rotation
 
   this.out = new ByteArray();
 }
@@ -136,6 +137,14 @@ GIFEncoder.prototype.setRepeat = function(repeat) {
 GIFEncoder.prototype.setTransparent = function(color) {
   this.transparent = color;
 };
+
+/*
+  Rotates 90 degrees (1) or -90 degrees (-1)
+*/
+GIFEncoder.prototype.setRotate = function(r) {
+  this.rotate = r;
+}
+
 
 /*
   Adds next GIF frame. The frame is not written immediately, but is
@@ -261,12 +270,21 @@ GIFEncoder.prototype.analyzePixels = function() {
 GIFEncoder.prototype.indexPixels = function(imgq) {
   var nPix = this.pixels.length / 3;
   this.indexedPixels = new Uint8Array(nPix);
-  var k = 0;
   for (var j = 0; j < nPix; j++) {
+    var i = j*3;
+    if (this.rotate) {
+      var yy = (j % this.height);
+      var xx = Math.floor(j / this.height);
+      if (this.rotate > 0)
+        yy = this.height - 1 - yy;
+      else
+        xx = this.width - 1 - xx;
+      i = ((yy * this.width) + xx) * 3;
+    }
     var index = this.findClosestRGB(
-      this.pixels[k++] & 0xff,
-      this.pixels[k++] & 0xff,
-      this.pixels[k++] & 0xff
+      this.pixels[i++] & 0xff,
+      this.pixels[i++] & 0xff,
+      this.pixels[i++] & 0xff
     );
     this.usedEntry[index] = true;
     this.indexedPixels[j] = index;
@@ -333,6 +351,18 @@ GIFEncoder.prototype.ditherPixels = function(kernel, serpentine) {
     for (var x = (direction == 1 ? 0 : width - 1), xend = (direction == 1 ? width : 0); x !== xend; x += direction) {
 
       index = (y * width) + x;
+
+      // Rotate?
+      if (this.rotate) {
+        var yy = (index % height);
+        var xx = Math.floor(index / height);
+        if (this.rotate > 0)
+          yy = height - 1 - yy;
+        else
+          xx = width - 1 - xx;
+        index = (yy * width) + xx;
+      }
+
       // Get original colour
       var idx = index * 3;
       var r1 = data[idx];
@@ -382,7 +412,7 @@ GIFEncoder.prototype.findClosestRGB = function(r, g, b, used) {
   if (this.neuQuant && !used) {
     return this.neuQuant.lookupRGB(r, g, b);
   }
-  
+
   var c = b | (g << 8) | (r << 16);
 
   var minpos = 0;
@@ -468,8 +498,13 @@ GIFEncoder.prototype.writeImageDesc = function() {
   this.out.writeByte(0x2c); // image separator
   this.writeShort(0); // image position x,y = 0,0
   this.writeShort(0);
-  this.writeShort(this.width); // image size
-  this.writeShort(this.height);
+  if (this.rotate) {
+    this.writeShort(this.height); // image size
+    this.writeShort(this.width);
+  } else {
+    this.writeShort(this.width); // image size
+    this.writeShort(this.height);
+  }
 
   // packed fields
   if (this.firstFrame || this.globalPalette) {
@@ -492,8 +527,13 @@ GIFEncoder.prototype.writeImageDesc = function() {
 */
 GIFEncoder.prototype.writeLSD = function() {
   // logical screen size
-  this.writeShort(this.width);
-  this.writeShort(this.height);
+  if (this.rotate) {
+    this.writeShort(this.height); // image size
+    this.writeShort(this.width);
+  } else {
+    this.writeShort(this.width); // image size
+    this.writeShort(this.height);
+  }
 
   // packed fields
   this.out.writeByte(

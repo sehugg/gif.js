@@ -14,6 +14,7 @@ class GIF extends EventEmitter
     transparent: null
     debug: false
     dither: false # see GIFEncoder.js for dithering options
+    rotate: 0
 
   frameDefaults =
     delay: 500 # ms
@@ -188,6 +189,7 @@ class GIF extends EventEmitter
       dither: @options.dither
       globalPalette: @options.globalPalette
       repeat: @options.repeat
+      rotate: @options.rotate
       canTransfer: (browser.name is 'chrome')
 
     if frame.data?
